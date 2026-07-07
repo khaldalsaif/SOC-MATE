@@ -1118,17 +1118,17 @@ function renderIOCs() {
     const covering = splunkCtrlsWithCoverage.filter(c => c.fields && c.fields[type]);
     if (covering.length < 2) return "";
     const opts = covering.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join("");
-    return `<select class="ctrl-filter" data-type="${type}" title="Filter Splunk source">
-              <option value="">All sources</option>${opts}
-            </select>`;
+    return `<span class="ctrl-tag ctrl-tag-spl" title="Splunk source filter">SPL</span>` +
+           `<select class="ctrl-select ctrl-filter" data-type="${type}" title="Filter Splunk source">` +
+           `<option value="">All sources</option>${opts}</select>`;
   }
   function kqlFilterHtml(type) {
     const covering = kqlCtrlsWithCoverage.filter(c => c.fields && c.fields[type] && c.fields[type].col);
     if (covering.length < 2) return "";
     const opts = covering.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join("");
-    return `<select class="kql-filter" data-type="${type}" title="Filter KQL table">
-              <option value="">All tables</option>${opts}
-            </select>`;
+    return `<span class="ctrl-tag ctrl-tag-kql" title="KQL table filter">KQL</span>` +
+           `<select class="ctrl-select kql-filter" data-type="${type}" title="Filter KQL table">` +
+           `<option value="">All tables</option>${opts}</select>`;
   }
 
   for (const type of types) {
@@ -3548,7 +3548,14 @@ if (saveAutoExtractUrlsBtn) saveAutoExtractUrlsBtn.addEventListener("click", () 
    ============================================================ */
 function loadKqlControls(cb) {
   chrome.storage.local.get(["kqlControls"], (d) => {
-    kqlControls = Array.isArray(d.kqlControls) ? d.kqlControls : [];
+    if (Array.isArray(d.kqlControls)) {
+      kqlControls = d.kqlControls;
+    } else {
+      // First run — pre-populate with all default Defender tables as examples
+      kqlControls = DEFAULT_KQL_CONTROLS.map(c => ({
+        ...c, fields: Object.fromEntries(Object.entries(c.fields).map(([t, v]) => [t, { ...v }]))
+      }));
+    }
     if (cb) cb();
   });
 }
