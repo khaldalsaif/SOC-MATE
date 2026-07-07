@@ -3333,13 +3333,36 @@ function loadSplunkControls(cb) {
   });
 }
 
-/* Render one control card and append it to `container`. */
-function renderControlCard(ctrl, container) {
-  const card = document.createElement("div");
+/* Render one collapseable Splunk control card and append it to `container`.
+   startOpen=true for brand-new cards; saved cards start collapsed. */
+function renderControlCard(ctrl, container, startOpen = false) {
+  const card = document.createElement("details");
   card.className = "spl-ctrl-card";
   card.dataset.ctrlId = ctrl.id;
+  if (startOpen) card.open = true;
 
-  // ── header: name input + remove button ──────────────────────
+  // ── summary: collapse toggle — name label + remove ───────────
+  const summary = document.createElement("summary");
+  summary.className = "spl-ctrl-summary";
+
+  const titleSpan = document.createElement("span");
+  titleSpan.className = "spl-ctrl-title";
+  titleSpan.textContent = ctrl.name || "New control";
+
+  const removeBtn = document.createElement("button");
+  removeBtn.className = "mini";
+  removeBtn.textContent = "✕ Remove";
+  removeBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); card.remove(); });
+
+  summary.appendChild(titleSpan);
+  summary.appendChild(removeBtn);
+  card.appendChild(summary);
+
+  // ── body: editable fields (shown when open) ──────────────────
+  const body = document.createElement("div");
+  body.className = "spl-ctrl-body";
+
+  // Name input (syncs summary label live)
   const hdr = document.createElement("div");
   hdr.className = "spl-ctrl-header";
 
@@ -3348,15 +3371,11 @@ function renderControlCard(ctrl, container) {
   nameInp.type = "text";
   nameInp.placeholder = "Control name";
   nameInp.value = ctrl.name || "";
-
-  const removeBtn = document.createElement("button");
-  removeBtn.className = "mini";
-  removeBtn.textContent = "✕ Remove";
-  removeBtn.addEventListener("click", () => card.remove());
-
+  nameInp.addEventListener("input", () => {
+    titleSpan.textContent = nameInp.value.trim() || "New control";
+  });
   hdr.appendChild(nameInp);
-  hdr.appendChild(removeBtn);
-  card.appendChild(hdr);
+  body.appendChild(hdr);
 
   // ── meta: index + sourcetype ─────────────────────────────────
   const meta = document.createElement("div");
@@ -3377,13 +3396,13 @@ function renderControlCard(ctrl, container) {
   meta.appendChild(idxInp);
   meta.appendChild(mkMetaLabel("sourcetype"));
   meta.appendChild(stInp);
-  card.appendChild(meta);
+  body.appendChild(meta);
 
   // ── field mappings per IOC type ──────────────────────────────
-  const div = document.createElement("div");
-  div.className = "spl-ctrl-divider";
-  div.textContent = "Field per IOC type  (blank = not covered)";
-  card.appendChild(div);
+  const divider = document.createElement("div");
+  divider.className = "spl-ctrl-divider";
+  divider.textContent = "Field per IOC type  (blank = not covered)";
+  body.appendChild(divider);
 
   const fgrid = document.createElement("div");
   fgrid.className = "spl-ctrl-fields";
@@ -3403,7 +3422,8 @@ function renderControlCard(ctrl, container) {
     fgrid.appendChild(lbl);
     fgrid.appendChild(finp);
   }
-  card.appendChild(fgrid);
+  body.appendChild(fgrid);
+  card.appendChild(body);
 
   // ── stash references for collection ─────────────────────────
   card._nameInp = nameInp;
@@ -3448,7 +3468,7 @@ const splCtrlAddBtn = document.getElementById("spl-ctrl-add");
 if (splCtrlAddBtn) splCtrlAddBtn.addEventListener("click", () => {
   const list = document.getElementById("spl-controls-list");
   if (!list) return;
-  renderControlCard({ id: "ctrl_" + Date.now(), name: "", index: "", sourcetype: "", fields: {} }, list);
+  renderControlCard({ id: "ctrl_" + Date.now(), name: "", index: "", sourcetype: "", fields: {} }, list, true);
 });
 
 /* "Load defaults" button */
@@ -3526,13 +3546,36 @@ function loadKqlControls(cb) {
   });
 }
 
-/* Render one KQL control card and append it to `container`. */
-function renderKqlControlCard(ctrl, container) {
-  const card = document.createElement("div");
+/* Render one collapseable KQL control card and append it to `container`.
+   startOpen=true for brand-new cards; saved cards start collapsed. */
+function renderKqlControlCard(ctrl, container, startOpen = false) {
+  const card = document.createElement("details");
   card.className = "spl-ctrl-card";
   card.dataset.ctrlId = ctrl.id;
+  if (startOpen) card.open = true;
 
-  // ── header: table name + remove button ──────────────────────
+  // ── summary: collapse toggle — table name label + remove ─────
+  const summary = document.createElement("summary");
+  summary.className = "spl-ctrl-summary";
+
+  const titleSpan = document.createElement("span");
+  titleSpan.className = "spl-ctrl-title";
+  titleSpan.textContent = ctrl.name || "New table";
+
+  const removeBtn = document.createElement("button");
+  removeBtn.className = "mini";
+  removeBtn.textContent = "✕ Remove";
+  removeBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); card.remove(); });
+
+  summary.appendChild(titleSpan);
+  summary.appendChild(removeBtn);
+  card.appendChild(summary);
+
+  // ── body: editable fields (shown when open) ──────────────────
+  const body = document.createElement("div");
+  body.className = "spl-ctrl-body";
+
+  // Table name input (syncs summary label live)
   const hdr = document.createElement("div");
   hdr.className = "spl-ctrl-header";
 
@@ -3541,21 +3584,17 @@ function renderKqlControlCard(ctrl, container) {
   nameInp.type = "text";
   nameInp.placeholder = "Table name (e.g. DeviceNetworkEvents)";
   nameInp.value = ctrl.name || "";
-
-  const removeBtn = document.createElement("button");
-  removeBtn.className = "mini";
-  removeBtn.textContent = "✕ Remove";
-  removeBtn.addEventListener("click", () => card.remove());
-
+  nameInp.addEventListener("input", () => {
+    titleSpan.textContent = nameInp.value.trim() || "New table";
+  });
   hdr.appendChild(nameInp);
-  hdr.appendChild(removeBtn);
-  card.appendChild(hdr);
+  body.appendChild(hdr);
 
   // ── column + operator per IOC type ──────────────────────────
-  const div = document.createElement("div");
-  div.className = "spl-ctrl-divider";
-  div.textContent = "Column + operator per IOC type  (blank = not covered)";
-  card.appendChild(div);
+  const divider = document.createElement("div");
+  divider.className = "spl-ctrl-divider";
+  divider.textContent = "Column + operator per IOC type  (blank = not covered)";
+  body.appendChild(divider);
 
   const fgrid = document.createElement("div");
   fgrid.className = "kql-ctrl-fields";
@@ -3594,7 +3633,8 @@ function renderKqlControlCard(ctrl, container) {
     });
     fgrid.appendChild(sel);
   }
-  card.appendChild(fgrid);
+  body.appendChild(fgrid);
+  card.appendChild(body);
 
   card._nameInp = nameInp;
   container.appendChild(card);
@@ -3641,7 +3681,7 @@ const kqlCtrlAddBtn = document.getElementById("kql-ctrl-add");
 if (kqlCtrlAddBtn) kqlCtrlAddBtn.addEventListener("click", () => {
   const list = document.getElementById("kql-controls-list");
   if (!list) return;
-  renderKqlControlCard({ id: "kql_" + Date.now(), name: "", fields: {} }, list);
+  renderKqlControlCard({ id: "kql_" + Date.now(), name: "", fields: {} }, list, true);
 });
 
 /* "Load defaults" button */

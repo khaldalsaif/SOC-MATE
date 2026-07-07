@@ -860,20 +860,55 @@ body.fr-open { padding-bottom: 72px; }
 .ctrl-select option { background: #0f172a; }
 
 /* ================================================================
-   Splunk security control cards
+   Splunk / KQL collapseable control cards  (<details> element)
    ================================================================ */
 .spl-ctrl-card {
   background: #0b1121;
   border: 1px solid #1e293b;
   border-radius: 6px;
-  padding: 8px 10px;
+  padding: 0;
   margin-bottom: 8px;
+}
+/* Summary row — always visible, acts as the collapse toggle */
+.spl-ctrl-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  cursor: pointer;
+  border-radius: 6px;
+  list-style: none;
+  user-select: none;
+}
+.spl-ctrl-summary::-webkit-details-marker { display: none; }
+.spl-ctrl-summary::before {
+  content: "›";
+  font-size: 14px;
+  color: #475569;
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+details.spl-ctrl-card[open] > .spl-ctrl-summary::before { transform: rotate(90deg); }
+.spl-ctrl-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #38bdf8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Editable body shown only when open */
+.spl-ctrl-body {
+  padding: 0 10px 10px;
+  border-top: 1px solid #1e293b;
 }
 .spl-ctrl-header {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-bottom: 6px;
+  padding-top: 8px;
 }
 .spl-ctrl-name {
   flex: 1;
