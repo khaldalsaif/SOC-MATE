@@ -1111,6 +1111,26 @@ function renderIOCs() {
     return;
   }
 
+  // Build filter select HTML for Splunk controls and KQL tables (shown only when >1 defined)
+  const splunkCtrlsWithCoverage = splunkControls.length > 1 ? splunkControls : [];
+  const kqlCtrlsWithCoverage    = kqlControls.length > 1    ? kqlControls    : [];
+  function splunkFilterHtml(type) {
+    const covering = splunkCtrlsWithCoverage.filter(c => c.fields && c.fields[type]);
+    if (covering.length < 2) return "";
+    const opts = covering.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join("");
+    return `<select class="ctrl-filter" data-type="${type}" title="Filter Splunk source">
+              <option value="">All sources</option>${opts}
+            </select>`;
+  }
+  function kqlFilterHtml(type) {
+    const covering = kqlCtrlsWithCoverage.filter(c => c.fields && c.fields[type] && c.fields[type].col);
+    if (covering.length < 2) return "";
+    const opts = covering.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join("");
+    return `<select class="kql-filter" data-type="${type}" title="Filter KQL table">
+              <option value="">All tables</option>${opts}
+            </select>`;
+  }
+
   for (const type of types) {
     const values = rendered[type];
     if (!values || values.length === 0) continue;
@@ -1148,9 +1168,11 @@ function renderIOCs() {
                  data-type="${type}" data-default="${defaultField}" value="${fieldVal}"
                  placeholder="custom field" />
           <div style="margin-top:6px;">
+            ${splunkFilterHtml(type)}
             <button class="or"       data-type="${type}">OR</button>
             <button class="and"      data-type="${type}">AND</button>
             <button class="in"       data-type="${type}">IN</button>
+            ${kqlFilterHtml(type)}
             <button class="defender" data-type="${type}">Defender</button>
           </div>
           <div class="enc-list">${rows}</div>
@@ -1176,9 +1198,11 @@ function renderIOCs() {
                data-type="${type}" data-default="${defaultField}" value="${fieldVal}"
                placeholder="custom field" />
         <div style="margin-top:6px;">
+          ${splunkFilterHtml(type)}
           <button class="or"       data-type="${type}">OR</button>
           <button class="and"      data-type="${type}">AND</button>
           <button class="in"       data-type="${type}">IN</button>
+          ${kqlFilterHtml(type)}
           <button class="defender" data-type="${type}">Defender</button>
           <button class="pivot-toggle" data-type="${type}">Pivot / Enrich</button>
         </div>
@@ -1282,6 +1306,16 @@ function buildWv() {
   const suf = wildcardSufEl && wildcardSufEl.checked;
   return v => `${pre ? "*" : ""}${escapeSpl(v)}${suf ? "*" : ""}`;
 }
+/* Read the per-card source filter selects (empty string = "All"). */
+function getCtrlFilter(type) {
+  const sel = document.querySelector(`.ctrl-filter[data-type="${type}"]`);
+  return sel ? sel.value : "";
+}
+function getKqlFilter(type) {
+  const sel = document.querySelector(`.kql-filter[data-type="${type}"]`);
+  return sel ? sel.value : "";
+}
+
 /* Controls that cover a given IOC type (have a non-empty field for it). */
 function controlsForType(type) {
   return splunkControls.filter(c => c.fields && c.fields[type]);
@@ -1296,7 +1330,8 @@ function buildQuery(type, operator) {
   const values = state.rendered[type] || [];
   if (!values.length) return;
   const wv       = buildWv();
-  const controls = controlsForType(type);
+  const ctrlFilter = getCtrlFilter(type);
+  const controls = controlsForType(type).filter(c => !ctrlFilter || c.id === ctrlFilter);
   if (controls.length) {
     const blocks = controls.map(c => {
       const parts = [];
@@ -1317,7 +1352,8 @@ function buildInQuery(type) {
   const values = state.rendered[type] || [];
   if (!values.length) return;
   const wv       = buildWv();
-  const controls = controlsForType(type);
+  const ctrlFilter = getCtrlFilter(type);
+  const controls = controlsForType(type).filter(c => !ctrlFilter || c.id === ctrlFilter);
   if (controls.length) {
     const blocks = controls.map(c => {
       const field = c.fields[type];
@@ -1352,7 +1388,8 @@ function buildDefenderQuery(type) {
   const colOverride = (typed && typed !== splDef) ? typed : null;
 
   // Use controls when any cover this IOC type (mirrors Splunk multi-source behaviour)
-  const controls = kqlControlsForType(type);
+  const kqlFilter = getKqlFilter(type);
+  const controls = kqlControlsForType(type).filter(c => !kqlFilter || c.id === kqlFilter);
   if (controls.length) {
     const blocks = controls.map(ctrl => {
       const col = colOverride || ctrl.fields[type].col;

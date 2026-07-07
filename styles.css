@@ -844,6 +844,21 @@ body.fr-open { padding-bottom: 72px; }
 }
 .ifc-sel:focus { border-color: #38bdf8; outline: none; }
 
+/* Per-card source/table filter select (appears inline before OR/AND/IN or Defender) */
+.ctrl-select {
+  font-size: 11px;
+  padding: 3px 5px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  color: #94a3b8;
+  cursor: pointer;
+  max-width: 130px;
+  vertical-align: middle;
+}
+.ctrl-select:focus { border-color: #38bdf8; outline: none; }
+.ctrl-select option { background: #0f172a; }
+
 /* ================================================================
    Splunk security control cards
    ================================================================ */
