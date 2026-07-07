@@ -630,6 +630,41 @@ details.ioc-section[open] > summary::before { content: "▾"; }
 body.fr-open { padding-bottom: 72px; }
 
 /* ================================================================
+   Report tab
+   ================================================================ */
+.report-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 10px 12px;
+}
+.report-form input[type="text"],
+.report-form select,
+.report-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: #0b1121;
+  border: 1px solid #1e293b;
+  border-radius: 4px;
+  color: #cbd5e1;
+  font-size: 12px;
+  padding: 5px 7px;
+  margin-bottom: 4px;
+  font-family: inherit;
+  resize: vertical;
+}
+.report-form input[type="text"]:focus,
+.report-form select:focus,
+.report-form textarea:focus { outline: 1px solid #38bdf8; border-color: #38bdf8; }
+.report-iocs-area {
+  background: #060e1c !important;
+  color: #64748b !important;
+  cursor: default;
+  font-family: monospace;
+  font-size: 11px !important;
+}
+
+/* ================================================================
    Feature search panel  (Ctrl+K / 🔍 button)
    Full-screen overlay so every feature is reachable by keyboard.
    ================================================================ */

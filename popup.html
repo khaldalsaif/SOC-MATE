@@ -24,7 +24,8 @@
     <button class="tab active" data-tab="extract"    title="Extract (Ctrl+1)">Extract</button>
     <button class="tab"        data-tab="utilities"  title="Utilities (Ctrl+2)">Utilities</button>
     <button class="tab"        data-tab="history"    title="History (Ctrl+3)">History</button>
-    <button class="tab"        data-tab="settings"   title="Settings (Ctrl+4)">Settings</button>
+    <button class="tab"        data-tab="report"     title="Report (Ctrl+4)">Report</button>
+    <button class="tab"        data-tab="settings"   title="Settings (Ctrl+5)">Settings</button>
   </div>
 
   <!-- ============ EXTRACT TAB ============ -->
@@ -353,6 +354,46 @@
     <div id="history-list"></div>
   </section>
 
+  <!-- ============ REPORT TAB ============ -->
+  <section id="tab-report" class="tabpanel">
+    <div class="topbar" style="justify-content:space-between;align-items:center;">
+      <span class="hint" style="font-size:11px;">Auto-fills from current extraction.</span>
+      <div style="display:flex;gap:6px;">
+        <button id="report-refresh" class="mini" title="Reload IOCs from extraction">↻ Refresh</button>
+        <button id="report-copy" class="accent">Copy summary</button>
+      </div>
+    </div>
+    <div class="report-form">
+      <label class="util-label">Subject</label>
+      <input id="report-subject" type="text" placeholder="Alert / incident title" />
+
+      <label class="util-label">ID from security control</label>
+      <input id="report-id" type="text" placeholder="Splunk notable ID or Defender alert ID" />
+
+      <label class="util-label">Status</label>
+      <select id="report-status">
+        <option value="">— select —</option>
+        <option value="Open">Open</option>
+        <option value="In Progress">In Progress</option>
+        <option value="True Positive">True Positive</option>
+        <option value="False Positive">False Positive</option>
+        <option value="Benign">Benign</option>
+      </select>
+
+      <label class="util-label">Description</label>
+      <textarea id="report-description" rows="3" placeholder="Brief description of the alert or incident"></textarea>
+
+      <label class="util-label">IOCs <em class="hint">(auto-filled · includes verdicts when enriched)</em></label>
+      <textarea id="report-iocs" rows="7" class="report-iocs-area" readonly placeholder="Extract IOCs first — they will appear here automatically."></textarea>
+
+      <label class="util-label">Recommendation</label>
+      <textarea id="report-recommendation" rows="3" placeholder="Recommended actions or next steps"></textarea>
+
+      <label class="util-label">Conclusion</label>
+      <textarea id="report-conclusion" rows="3" placeholder="Final verdict or outcome"></textarea>
+    </div>
+  </section>
+
   <!-- ============ SETTINGS TAB ============ -->
   <section id="tab-settings" class="tabpanel">
     <p class="hint settings-intro">All settings are stored locally on this machine. Tap a section to expand.</p>
@@ -669,6 +710,19 @@
         <input type="number" id="hist-cap" min="1" max="50" value="20" style="width:80px;" />
         <button id="save-hist" class="accent">Save history settings</button>
         <span id="hist-status" class="hint"></span>
+      </div>
+    </details>
+
+    <details class="settings-group">
+      <summary>Team config — export &amp; import</summary>
+      <p class="hint">Share your Splunk controls, KQL tables, and field settings with teammates. Export once, share the file, everyone else imports it.</p>
+      <div class="util-btns">
+        <button id="export-config" class="accent">Export config</button>
+        <label class="mini" style="cursor:pointer;padding:3px 8px;border:1px solid #334155;border-radius:4px;display:inline-flex;align-items:center;">
+          Import config
+          <input type="file" id="import-config-file" accept=".json" style="display:none;" />
+        </label>
+        <span id="config-io-status" class="hint"></span>
       </div>
     </details>
 

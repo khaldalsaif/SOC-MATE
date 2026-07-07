@@ -42,7 +42,51 @@ function recordContentTab(tabId) {
     chrome.storage.session.set({
       lastContentTab: { id: tab.id, windowId: tab.windowId, url, title: tab.title || "", ts: Date.now() }
     });
+    autoExtractBadge(tab.id, url).catch(() => {});
   });
+}
+
+/* In-memory throttle: skip re-extraction of the same URL within 60 s.
+   Resets on service-worker restart, which is fine — fresh SW means fresh context. */
+const _badgeThrottle = {};
+
+async function autoExtractBadge(tabId, url) {
+  if (!url || !/^https?:\/\//i.test(url)) return;
+  if (/^(chrome|edge|about|view-source|chrome-extension):/i.test(url)) return;
+  if (/^https:\/\/chrome(web)?store\.google\.com/i.test(url)) return;
+
+  const now = Date.now();
+  if (_badgeThrottle[url] && now - _badgeThrottle[url] < 60000) return;
+  _badgeThrottle[url] = now;
+
+  let results;
+  try {
+    results = await chrome.scripting.executeScript({ target: { tabId }, func: pageExtract });
+  } catch (_) { return; }
+
+  if (!results || !results[0] || results[0].error) return;
+  const payload = results[0].result;
+  if (!payload) return;
+
+  const typed = payload.typed || {};
+  const hasIOCs = Object.values(typed).some(v => Array.isArray(v) && v.length > 0);
+  if (!hasIOCs) return;
+
+  await chrome.storage.local.set({
+    bgExtractPending: {
+      text:  payload.text  || "",
+      typed,
+      procs: payload.procs || [],
+      diag:  payload.diag  || {},
+      url,
+      ts: now
+    }
+  });
+
+  try {
+    chrome.action.setBadgeBackgroundColor({ color: "#ef4444" });
+    chrome.action.setBadgeText({ text: "●" });
+  } catch (_) {}
 }
 chrome.tabs.onActivated.addListener(({ tabId }) => recordContentTab(tabId));
 chrome.tabs.onUpdated.addListener((tabId, info, tab) => {

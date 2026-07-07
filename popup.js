@@ -1283,6 +1283,8 @@ function attachEvents() {
     btn.addEventListener("click", () => buildDefenderQuery(btn.dataset.type)));
   document.querySelectorAll(".pivot-toggle").forEach(btn =>
     btn.addEventListener("click", () => togglePivotPanel(btn.dataset.type)));
+  // Keep Report tab IOC field in sync whenever results are redrawn
+  if (typeof window._reportRefreshIocs === "function") window._reportRefreshIocs();
 }
 
 /* ---------- query builders ---------- */
@@ -5598,6 +5600,139 @@ level: high`;
 })();
 
 /* ============================================================
+   REPORT TAB — investigation summary builder
+   Pre-fills IOCs (with enrichment verdicts when available) and
+   the page title into a ready-to-paste ticket template.
+   ============================================================ */
+(function wireReportTab() {
+  function buildReportIocs() {
+    const typeOrder = ["src_ip","dest_ip","ips","domains","urls","emails","email_subjects",
+                       "hostnames","files","paths","md5","sha1","sha256","cves","user_agents"];
+    const lines = [];
+    for (const type of typeOrder) {
+      const values = state.rendered[type];
+      if (!values || !values.length) continue;
+      lines.push(`${TITLES[type] || type.toUpperCase()}:`);
+      for (const val of values) {
+        const enriches = state.enrichResults.filter(r => r.value === val && r.iocType === type);
+        if (enriches.length) {
+          lines.push(`  ${val} — ${enriches.map(r => r.summary).join(" · ")}`);
+        } else {
+          lines.push(`  ${val}`);
+        }
+      }
+      lines.push("");
+    }
+    return lines.join("\n").trimEnd();
+  }
+
+  function refreshIocs() {
+    const el = document.getElementById("report-iocs");
+    if (el) el.value = buildReportIocs();
+  }
+
+  // Expose so renderIOCs() can call it after every redraw
+  window._reportRefreshIocs = refreshIocs;
+
+  function fillSubject() {
+    const subjectEl = document.getElementById("report-subject");
+    if (!subjectEl || subjectEl.value.trim()) return;
+    chrome.storage.session.get(["lastContentTab"], (d) => {
+      if (d && d.lastContentTab && d.lastContentTab.title) {
+        subjectEl.value = d.lastContentTab.title;
+      }
+    });
+  }
+
+  // On tab open: refresh IOCs + auto-fill subject
+  const reportTabBtn = document.querySelector('.tab[data-tab="report"]');
+  if (reportTabBtn) reportTabBtn.addEventListener("click", () => { refreshIocs(); fillSubject(); });
+
+  // Refresh button
+  document.getElementById("report-refresh")?.addEventListener("click", () => { refreshIocs(); fillSubject(); });
+
+  // Copy summary
+  document.getElementById("report-copy")?.addEventListener("click", () => {
+    const get = id => (document.getElementById(id)?.value || "").trim();
+    const text = [
+      `Subject: ${get("report-subject")}`,
+      `ID from security control: ${get("report-id")}`,
+      `Status: ${get("report-status")}`,
+      ``,
+      `Description:`,
+      get("report-description"),
+      ``,
+      `IOCs:`,
+      get("report-iocs"),
+      ``,
+      `Recommendation:`,
+      get("report-recommendation"),
+      ``,
+      `Conclusion:`,
+      get("report-conclusion"),
+    ].join("\n");
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById("report-copy");
+      if (btn) { btn.textContent = "Copied ✓"; setTimeout(() => { btn.textContent = "Copy summary"; }, 1500); }
+    });
+  });
+})();
+
+/* ============================================================
+   CONFIG EXPORT / IMPORT
+   ============================================================ */
+(function wireConfigIO() {
+  document.getElementById("export-config")?.addEventListener("click", () => {
+    chrome.storage.local.get(["splunkControls","kqlControls","kqlSettings","iocFieldSettings"], (d) => {
+      const config = {
+        version: "1",
+        exported: new Date().toISOString(),
+        splunkControls:   d.splunkControls   || [],
+        kqlControls:      d.kqlControls      || [],
+        kqlSettings:      d.kqlSettings      || {},
+        iocFieldSettings: d.iocFieldSettings || {}
+      };
+      const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href = url; a.download = "socmate-config.json"; a.click();
+      URL.revokeObjectURL(url);
+    });
+  });
+
+  document.getElementById("import-config-file")?.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const st = document.getElementById("config-io-status");
+      try {
+        const config = JSON.parse(ev.target.result);
+        if (!config.version) throw new Error("Not a valid SOC Mate config file");
+        const toSave = {};
+        if (Array.isArray(config.splunkControls))         toSave.splunkControls   = config.splunkControls;
+        if (Array.isArray(config.kqlControls))            toSave.kqlControls      = config.kqlControls;
+        if (config.kqlSettings && typeof config.kqlSettings === "object")
+                                                          toSave.kqlSettings      = config.kqlSettings;
+        if (config.iocFieldSettings && typeof config.iocFieldSettings === "object")
+                                                          toSave.iocFieldSettings = config.iocFieldSettings;
+        chrome.storage.local.set(toSave, () => {
+          loadSplunkControls(buildSplControls);
+          loadKqlControls(buildKqlControls);
+          loadIocFieldSettings(buildIocFieldsGrid);
+          loadKqlSettings(buildKqlGrid);
+          if (st) { st.textContent = "Imported ✓"; setTimeout(() => { st.textContent = ""; }, 2500); }
+        });
+      } catch (err) {
+        if (st) st.textContent = "Error: " + err.message;
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ""; // allow re-importing same file
+  });
+})();
+
+/* ============================================================
    GLOBAL KEYBOARD SHORTCUTS
    Called with capture:true so preventDefault fires before
    Chrome (or any other listener) can act on the key.
@@ -5605,7 +5740,7 @@ level: high`;
    a text field (so typing is never interrupted).
    ============================================================ */
 (function wireShortcuts() {
-  const TABS = ["extract", "utilities", "history", "settings"];
+  const TABS = ["extract", "utilities", "history", "report", "settings"];
 
   function notTyping() {
     const t = document.activeElement;
@@ -5623,7 +5758,7 @@ level: high`;
 
     // ── Ctrl+1–4  →  tab navigation ──────────────────────────────
     const n = parseInt(key);
-    if (n >= 1 && n <= 4 && !shift) {
+    if (n >= 1 && n <= 5 && !shift) {
       e.preventDefault();
       switchTab(TABS[n - 1]);
       return;
