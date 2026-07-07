@@ -1124,7 +1124,7 @@ function renderIOCs() {
   }
   function kqlFilterHtml(type) {
     const covering = kqlCtrlsWithCoverage.filter(c => c.fields && c.fields[type] && c.fields[type].col);
-    if (covering.length < 2) return "";
+    if (covering.length < 1) return "";
     const opts = covering.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join("");
     return `<span class="ctrl-tag ctrl-tag-kql" title="KQL table filter">KQL</span>` +
            `<select class="ctrl-select kql-filter" data-type="${type}" title="Filter KQL table">` +
