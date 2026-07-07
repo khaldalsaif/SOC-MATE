@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "SOC Mate",
+  "version": "4.2",
+  "description": "Analyst's everyday companion: site-aware IOC extraction (Splunk + Defender DOM, IPv4+IPv6), Defender process tree + command-line capture, sanitize/defang/redact, Splunk OR/AND/IN + Defender KQL builders, *Wildcard* toggle, decoders + HTML/HTTP/UA/subnet utilities, live VT/AbuseIPDB/RDAP/Geo enrichment.",
+  "permissions": ["activeTab", "storage", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "commands": {
+    "extract-page": {
+      "suggested_key": {
+        "default": "Ctrl+E",
+        "mac": "Command+E"
+      },
+      "description": "Extract IOCs from the active page (works even when popup is closed)"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon128.png"
+  },
+  "icons": {
+    "128": "icon128.png"
+  }
+}

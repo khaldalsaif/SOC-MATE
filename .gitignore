@@ -1,0 +1,5 @@
+# Chrome extension — nothing to ignore by default
+# Add any local scratch files below
+*.log
+.DS_Store
+Thumbs.db
