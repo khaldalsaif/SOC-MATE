@@ -3328,7 +3328,14 @@ const DEFAULT_KQL_CONTROLS = [
 
 function loadSplunkControls(cb) {
   chrome.storage.local.get(["splunkControls"], (d) => {
-    splunkControls = Array.isArray(d.splunkControls) ? d.splunkControls : [];
+    if (Array.isArray(d.splunkControls)) {
+      splunkControls = d.splunkControls;
+    } else {
+      // First run — show Sysmon and WinEvent as example controls
+      splunkControls = DEFAULT_SPL_CONTROLS
+        .filter(c => c.id === "sysmon" || c.id === "winevent")
+        .map(c => ({ ...c, fields: { ...c.fields } }));
+    }
     if (cb) cb();
   });
 }
