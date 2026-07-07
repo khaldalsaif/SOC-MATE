@@ -42,9 +42,20 @@ SOC Mate is a local unpacked extension (not published to a browser store). It wo
 **Chrome / Brave / Vivaldi / Opera**
 1. Clone or download this repository.
 2. Navigate to `chrome://extensions`.
+
+   ![Chrome extensions page](screenshots/install-01-chrome-extensions-page.png)
+
 3. Enable **Developer mode** (top-right toggle).
+
+   ![Enable Developer mode](screenshots/install-02-developer-mode.png)
+
 4. Click **Load unpacked** and select the folder containing `manifest.json`.
+
+   ![Load unpacked button](screenshots/install-03-load-unpacked.png)
+
 5. The SOC Mate icon appears in your toolbar — pin it for quick access.
+
+   ![Extension pinned in toolbar](screenshots/install-04-pinned.png)
 
 **Microsoft Edge**
 1. Clone or download this repository.
