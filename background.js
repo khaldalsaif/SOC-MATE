@@ -483,10 +483,9 @@ chrome.commands.onCommand.addListener(async (command) => {
     }
   });
 
-  /* Brief badge tick so the analyst sees something happened. */
+  /* Persistent red dot — stays on the icon until the popup is opened. */
   try {
-    chrome.action.setBadgeText({ text: "✓" });
-    chrome.action.setBadgeBackgroundColor({ color: "#22c55e" });
-    setTimeout(() => chrome.action.setBadgeText({ text: "" }), 3000);
+    chrome.action.setBadgeBackgroundColor({ color: "#ef4444" });
+    chrome.action.setBadgeText({ text: "●" });
   } catch (_) { /* non-fatal if badge API unavailable */ }
 });

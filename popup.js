@@ -3455,6 +3455,9 @@ loadAutoExtractUrls();
 /* Auto-extract toggle: restore its saved state, then (once results are restored)
    kick off an auto-extraction. Persist the box on change. */
 (function wireAutoExtract() {
+  /* Popup is now open — clear the red notification dot from the icon. */
+  try { chrome.action.setBadgeText({ text: "" }); } catch (_) {}
+
   const box = document.getElementById("auto-extract");
   chrome.storage.local.get("autoExtract", ({ autoExtract: saved }) => {
     autoExtract = saved !== false;          // default ON (the analyst asked for it)
