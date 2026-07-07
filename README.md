@@ -1,6 +1,6 @@
 # SOC Mate
 
-**SOC Mate** is a Chrome extension built for security analysts. It extracts indicators of compromise (IOCs) directly from Splunk and Microsoft Defender pages, builds ready-to-paste hunt queries, runs live enrichment, and ships a set of utilities that cover the most common analyst workflows — all without leaving the browser.
+**SOC Mate** is a browser extension for security analysts that works on **Chrome, Edge, and any Chromium-based browser**. It extracts indicators of compromise (IOCs) directly from Splunk and Microsoft Defender pages, builds ready-to-paste hunt queries, runs live enrichment, and ships a set of utilities that cover the most common analyst workflows — all without leaving the browser.
 
 ---
 
@@ -37,13 +37,21 @@
 
 ## Installation
 
-SOC Mate is a local Chrome extension (not published to the Web Store). Load it in developer mode:
+SOC Mate is a local unpacked extension (not published to a browser store). It works on **Chrome, Edge, Brave, Opera, Vivaldi**, and any other Chromium-based browser.
 
+**Chrome / Brave / Vivaldi / Opera**
 1. Clone or download this repository.
-2. Open Chrome and navigate to `chrome://extensions`.
+2. Navigate to `chrome://extensions`.
 3. Enable **Developer mode** (top-right toggle).
 4. Click **Load unpacked** and select the folder containing `manifest.json`.
-5. The SOC Mate icon appears in your toolbar. Pin it for quick access.
+5. The SOC Mate icon appears in your toolbar — pin it for quick access.
+
+**Microsoft Edge**
+1. Clone or download this repository.
+2. Navigate to `edge://extensions`.
+3. Enable **Developer mode** (left sidebar toggle).
+4. Click **Load unpacked** and select the folder containing `manifest.json`.
+5. Pin SOC Mate from the Extensions menu in the toolbar.
 
 > **Tip:** Click **⤢ Open in tab** to promote the popup to a persistent browser tab that survives while you work in other tabs.
 
