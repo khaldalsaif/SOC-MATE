@@ -664,6 +664,25 @@ body.fr-open { padding-bottom: 72px; }
   font-size: 11px !important;
 }
 
+/* Report template field rows (in Settings editor) */
+.rpt-fields-list { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.rpt-field-row {
+  display: grid;
+  grid-template-columns: 1fr 90px auto;
+  gap: 4px;
+  align-items: start;
+}
+.rpt-field-label {
+  background: #0b1121;
+  border: 1px solid #1e293b;
+  border-radius: 4px;
+  color: #cbd5e1;
+  font-size: 12px;
+  padding: 4px 6px;
+}
+.rpt-field-type { font-size: 11px; }
+.rpt-field-row > button.mini { align-self: start; }
+
 /* ================================================================
    Feature search panel  (Ctrl+K / 🔍 button)
    Full-screen overlay so every feature is reachable by keyboard.

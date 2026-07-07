@@ -357,41 +357,13 @@
   <!-- ============ REPORT TAB ============ -->
   <section id="tab-report" class="tabpanel">
     <div class="topbar" style="justify-content:space-between;align-items:center;">
-      <span class="hint" style="font-size:11px;">Auto-fills from current extraction.</span>
+      <select id="report-tpl-select" style="flex:1;max-width:190px;font-size:12px;padding:3px 6px;background:#0b1121;border:1px solid #334155;border-radius:4px;color:#cbd5e1;"></select>
       <div style="display:flex;gap:6px;">
         <button id="report-refresh" class="mini" title="Reload IOCs from extraction">↻ Refresh</button>
         <button id="report-copy" class="accent">Copy summary</button>
       </div>
     </div>
-    <div class="report-form">
-      <label class="util-label">Subject</label>
-      <input id="report-subject" type="text" placeholder="Alert / incident title" />
-
-      <label class="util-label">ID from security control</label>
-      <input id="report-id" type="text" placeholder="Splunk notable ID or Defender alert ID" />
-
-      <label class="util-label">Status</label>
-      <select id="report-status">
-        <option value="">— select —</option>
-        <option value="Open">Open</option>
-        <option value="In Progress">In Progress</option>
-        <option value="True Positive">True Positive</option>
-        <option value="False Positive">False Positive</option>
-        <option value="Benign">Benign</option>
-      </select>
-
-      <label class="util-label">Description</label>
-      <textarea id="report-description" rows="3" placeholder="Brief description of the alert or incident"></textarea>
-
-      <label class="util-label">IOCs <em class="hint">(auto-filled · includes verdicts when enriched)</em></label>
-      <textarea id="report-iocs" rows="7" class="report-iocs-area" readonly placeholder="Extract IOCs first — they will appear here automatically."></textarea>
-
-      <label class="util-label">Recommendation</label>
-      <textarea id="report-recommendation" rows="3" placeholder="Recommended actions or next steps"></textarea>
-
-      <label class="util-label">Conclusion</label>
-      <textarea id="report-conclusion" rows="3" placeholder="Final verdict or outcome"></textarea>
-    </div>
+    <div id="report-form" class="report-form"></div>
   </section>
 
   <!-- ============ SETTINGS TAB ============ -->
@@ -710,6 +682,18 @@
         <input type="number" id="hist-cap" min="1" max="50" value="20" style="width:80px;" />
         <button id="save-hist" class="accent">Save history settings</button>
         <span id="hist-status" class="hint"></span>
+      </div>
+    </details>
+
+    <details class="settings-group" id="report-tpl-group">
+      <summary>Report templates</summary>
+      <p class="hint">Build named ticket templates for different alert types. Each template defines the fields in order. The <strong>IOCs (auto)</strong> type auto-fills from your current extraction with enrichment verdicts inline.</p>
+      <div id="report-tpl-list"></div>
+      <div class="util-btns" style="margin-top:6px;">
+        <button id="report-tpl-add" class="mini">+ Add template</button>
+        <button id="report-tpl-defaults" class="mini">Load defaults</button>
+        <button id="save-report-tpls" class="accent">Save</button>
+        <span id="report-tpl-status" class="hint"></span>
       </div>
     </details>
 

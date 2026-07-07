@@ -27,6 +27,8 @@ let iocFieldSettings = {};   // { type: { field, index, sourcetype } } — persi
 let kqlSettings      = {};   // { type: { table, col, op } } — persisted to storage
 let splunkControls   = [];   // [{ id, name, index, sourcetype, fields:{type:fieldname} }]
 let kqlControls      = [];   // [{ id, name, fields:{type:{col,op}} }]
+let reportTemplates  = [];   // [{ id, name, fields:[{id,label,type,options?,autoFill?}] }]
+let activeTemplateId = "";
 let savedOpenSections   = null; // Set of IOC types that were open when popup last closed
 
 /* Are we running as the full-page workspace (popup.html?view=tab) rather than
@@ -3328,6 +3330,32 @@ const DEFAULT_KQL_CONTROLS = [
   }
 ];
 
+const DEFAULT_REPORT_TEMPLATES = [
+  {
+    id: "tpl_default",
+    name: "SOC Incident",
+    fields: [
+      { id:"f_subject",  label:"Subject",                  type:"text",     autoFill:"pageTitle" },
+      { id:"f_ctrl_id",  label:"ID from security control", type:"text" },
+      { id:"f_status",   label:"Status",                   type:"select",   options:"Open\nIn Progress\nTrue Positive\nFalse Positive\nBenign" },
+      { id:"f_desc",     label:"Description",              type:"textarea" },
+      { id:"f_iocs",     label:"IOCs",                     type:"iocs" },
+      { id:"f_rec",      label:"Recommendation",           type:"textarea" },
+      { id:"f_conc",     label:"Conclusion",               type:"textarea" }
+    ]
+  }
+];
+
+function loadReportTemplates(cb) {
+  chrome.storage.local.get(["reportTemplates","activeTemplateId"], (d) => {
+    reportTemplates  = Array.isArray(d.reportTemplates) && d.reportTemplates.length
+      ? d.reportTemplates
+      : DEFAULT_REPORT_TEMPLATES.map(t => JSON.parse(JSON.stringify(t)));
+    activeTemplateId = d.activeTemplateId || (reportTemplates[0] && reportTemplates[0].id) || "";
+    if (cb) cb();
+  });
+}
+
 function loadSplunkControls(cb) {
   chrome.storage.local.get(["splunkControls"], (d) => {
     if (Array.isArray(d.splunkControls)) {
@@ -3719,6 +3747,156 @@ if (saveKqlControlsBtn) saveKqlControlsBtn.addEventListener("click", () => {
   });
 });
 
+/* ============================================================
+   REPORT TEMPLATE BUILDER (Settings)
+   ============================================================ */
+function renderTemplateFieldRow(field, container) {
+  const row = document.createElement("div");
+  row.className = "rpt-field-row";
+  row.dataset.fieldId = field.id || ("f_" + Date.now());
+
+  const labelInp = document.createElement("input");
+  labelInp.type = "text";
+  labelInp.className = "rpt-field-label";
+  labelInp.placeholder = "Field label";
+  labelInp.value = field.label || "";
+  row.appendChild(labelInp);
+
+  const typeSelect = document.createElement("select");
+  typeSelect.className = "rpt-field-type ctrl-select";
+  ["text","textarea","select","iocs"].forEach(t => {
+    const opt = document.createElement("option");
+    opt.value = t;
+    opt.textContent = t === "iocs" ? "IOCs (auto)" : t;
+    if (field.type === t) opt.selected = true;
+    typeSelect.appendChild(opt);
+  });
+  row.appendChild(typeSelect);
+
+  const optionsWrap = document.createElement("div");
+  optionsWrap.style.display = field.type === "select" ? "block" : "none";
+  optionsWrap.style.gridColumn = "1 / -1";
+  const optionsInp = document.createElement("textarea");
+  optionsInp.rows = 2;
+  optionsInp.placeholder = "One option per line";
+  optionsInp.value = field.options || "";
+  optionsInp.style.cssText = "width:100%;box-sizing:border-box;font-size:11px;margin-top:3px;background:#0b1121;border:1px solid #1e293b;border-radius:4px;color:#cbd5e1;padding:4px 6px;";
+  optionsWrap.appendChild(optionsInp);
+  row.appendChild(optionsWrap);
+
+  typeSelect.addEventListener("change", () => {
+    optionsWrap.style.display = typeSelect.value === "select" ? "block" : "none";
+  });
+
+  const removeBtn = document.createElement("button");
+  removeBtn.className = "mini";
+  removeBtn.textContent = "✕";
+  removeBtn.addEventListener("click", () => row.remove());
+  row.appendChild(removeBtn);
+
+  container.appendChild(row);
+}
+
+function renderReportTemplateCard(tpl, container, startOpen = false) {
+  const card = document.createElement("details");
+  card.className = "spl-ctrl-card";
+  card.dataset.tplId = tpl.id;
+  if (startOpen) card.open = true;
+
+  const summary = document.createElement("summary");
+  summary.className = "spl-ctrl-summary";
+  const titleSpan = document.createElement("span");
+  titleSpan.className = "spl-ctrl-title";
+  titleSpan.textContent = tpl.name || "New template";
+  const removeBtn = document.createElement("button");
+  removeBtn.className = "mini";
+  removeBtn.textContent = "✕ Remove";
+  removeBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); card.remove(); });
+  summary.appendChild(titleSpan);
+  summary.appendChild(removeBtn);
+  card.appendChild(summary);
+
+  const body = document.createElement("div");
+  body.className = "spl-ctrl-body";
+
+  const nameInp = document.createElement("input");
+  nameInp.className = "spl-ctrl-name";
+  nameInp.type = "text";
+  nameInp.placeholder = "Template name";
+  nameInp.value = tpl.name || "";
+  nameInp.addEventListener("input", () => { titleSpan.textContent = nameInp.value.trim() || "New template"; });
+  body.appendChild(nameInp);
+  card._nameInp = nameInp;
+
+  const divider = document.createElement("div");
+  divider.className = "spl-ctrl-divider";
+  divider.textContent = "Fields — label · type · options (for dropdowns)";
+  body.appendChild(divider);
+
+  const fieldsList = document.createElement("div");
+  fieldsList.className = "rpt-fields-list";
+  for (const field of (tpl.fields || [])) renderTemplateFieldRow(field, fieldsList);
+  body.appendChild(fieldsList);
+
+  const addFieldBtn = document.createElement("button");
+  addFieldBtn.className = "mini";
+  addFieldBtn.style.marginTop = "6px";
+  addFieldBtn.textContent = "+ Add field";
+  addFieldBtn.addEventListener("click", () => {
+    renderTemplateFieldRow({ id: "f_" + Date.now(), label: "", type: "textarea" }, fieldsList);
+  });
+  body.appendChild(addFieldBtn);
+  card.appendChild(body);
+  container.appendChild(card);
+}
+
+function collectReportTemplates() {
+  const list = document.getElementById("report-tpl-list");
+  if (!list) return [];
+  const result = [];
+  list.querySelectorAll(".spl-ctrl-card").forEach(card => {
+    const name = card._nameInp ? card._nameInp.value.trim() : "";
+    if (!name) return;
+    const fields = [];
+    card.querySelectorAll(".rpt-field-row").forEach(row => {
+      const label   = (row.querySelector(".rpt-field-label")?.value || "").trim();
+      const type    = row.querySelector(".rpt-field-type")?.value || "textarea";
+      const options = (row.querySelector("textarea")?.value || "").trim();
+      if (!label && type !== "iocs") return;
+      const f = { id: row.dataset.fieldId || ("f_" + Date.now()), label, type };
+      if (type === "select" && options) f.options = options;
+      if (type === "text") f.autoFill = "pageTitle";
+      fields.push(f);
+    });
+    result.push({ id: card.dataset.tplId || ("tpl_" + Date.now()), name, fields });
+  });
+  return result;
+}
+
+function buildReportTemplatesList() {
+  const list = document.getElementById("report-tpl-list");
+  if (!list) return;
+  list.innerHTML = "";
+  for (const tpl of reportTemplates) renderReportTemplateCard(tpl, list);
+}
+
+document.getElementById("report-tpl-add")?.addEventListener("click", () => {
+  const list = document.getElementById("report-tpl-list");
+  if (list) renderReportTemplateCard({ id: "tpl_" + Date.now(), name: "", fields: [] }, list, true);
+});
+document.getElementById("report-tpl-defaults")?.addEventListener("click", () => {
+  reportTemplates = DEFAULT_REPORT_TEMPLATES.map(t => JSON.parse(JSON.stringify(t)));
+  buildReportTemplatesList();
+});
+document.getElementById("save-report-tpls")?.addEventListener("click", () => {
+  reportTemplates = collectReportTemplates();
+  chrome.storage.local.set({ reportTemplates }, () => {
+    buildTemplateSelector();
+    const st = document.getElementById("report-tpl-status");
+    if (st) { st.textContent = "Saved"; setTimeout(() => { st.textContent = ""; }, 2000); }
+  });
+});
+
 /* ---------- excluded (non-collectable) domains ---------- */
 function loadExcludedDomains() {
   chrome.storage.local.get(["excludedDomains"], (d) => {
@@ -3757,6 +3935,7 @@ loadIocFieldSettings(buildIocFieldsGrid);
 loadKqlSettings(buildKqlGrid);
 loadSplunkControls(buildSplControls);
 loadKqlControls(buildKqlControls);
+loadReportTemplates(() => { buildTemplateSelector(); buildReportTemplatesList(); });
 loadAutoExtractUrls();
 
 /* Auto-extract toggle: restore its saved state, then (once results are restored)
@@ -5600,78 +5779,133 @@ level: high`;
 })();
 
 /* ============================================================
-   REPORT TAB — investigation summary builder
-   Pre-fills IOCs (with enrichment verdicts when available) and
-   the page title into a ready-to-paste ticket template.
+   REPORT TAB — multi-template investigation summary builder
    ============================================================ */
-(function wireReportTab() {
-  function buildReportIocs() {
-    const typeOrder = ["src_ip","dest_ip","ips","domains","urls","emails","email_subjects",
-                       "hostnames","files","paths","md5","sha1","sha256","cves","user_agents"];
-    const lines = [];
-    for (const type of typeOrder) {
-      const values = state.rendered[type];
-      if (!values || !values.length) continue;
-      lines.push(`${TITLES[type] || type.toUpperCase()}:`);
-      for (const val of values) {
-        const enriches = state.enrichResults.filter(r => r.value === val && r.iocType === type);
-        if (enriches.length) {
-          lines.push(`  ${val} — ${enriches.map(r => r.summary).join(" · ")}`);
-        } else {
-          lines.push(`  ${val}`);
-        }
-      }
-      lines.push("");
+function buildReportIocs() {
+  const typeOrder = ["src_ip","dest_ip","ips","domains","urls","emails","email_subjects",
+                     "hostnames","files","paths","md5","sha1","sha256","cves","user_agents"];
+  const lines = [];
+  for (const type of typeOrder) {
+    const values = state.rendered[type];
+    if (!values || !values.length) continue;
+    lines.push(`${TITLES[type] || type.toUpperCase()}:`);
+    for (const val of values) {
+      const enriches = state.enrichResults.filter(r => r.value === val && r.iocType === type);
+      lines.push(enriches.length
+        ? `  ${val} — ${enriches.map(r => r.summary).join(" · ")}`
+        : `  ${val}`);
     }
-    return lines.join("\n").trimEnd();
+    lines.push("");
   }
+  return lines.join("\n").trimEnd();
+}
 
-  function refreshIocs() {
-    const el = document.getElementById("report-iocs");
-    if (el) el.value = buildReportIocs();
+function refreshReportIocs() {
+  const el = document.querySelector("#report-form [data-ioc-field='true']");
+  if (el) el.value = buildReportIocs();
+}
+window._reportRefreshIocs = refreshReportIocs;
+
+function buildReportForm() {
+  const container = document.getElementById("report-form");
+  if (!container) return;
+  const tpl = reportTemplates.find(t => t.id === activeTemplateId) || reportTemplates[0];
+  if (!tpl) {
+    container.innerHTML = '<p class="hint" style="padding:10px;">No templates yet — add one in Settings → Report templates.</p>';
+    return;
   }
+  container.innerHTML = "";
+  for (const field of (tpl.fields || [])) {
+    const lbl = document.createElement("label");
+    lbl.className = "util-label";
+    lbl.textContent = field.label || "(unlabeled)";
+    if (field.type === "iocs") {
+      const em = document.createElement("em");
+      em.className = "hint";
+      em.style.fontStyle = "normal";
+      em.textContent = " (auto-filled · includes verdicts when enriched)";
+      lbl.appendChild(em);
+    }
+    container.appendChild(lbl);
 
-  // Expose so renderIOCs() can call it after every redraw
-  window._reportRefreshIocs = refreshIocs;
+    let el;
+    if (field.type === "text") {
+      el = document.createElement("input");
+      el.type = "text";
+      el.placeholder = field.autoFill === "pageTitle" ? "Alert / incident title (auto-fills from page)" : "";
+      el.dataset.autoFill = field.autoFill || "";
+    } else if (field.type === "select") {
+      el = document.createElement("select");
+      const opts = (field.options || "").split("\n").map(s => s.trim()).filter(Boolean);
+      el.innerHTML = '<option value="">— select —</option>' +
+        opts.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("");
+    } else if (field.type === "iocs") {
+      el = document.createElement("textarea");
+      el.rows = 7;
+      el.className = "report-iocs-area";
+      el.readOnly = true;
+      el.dataset.iocField = "true";
+      el.placeholder = "Extract IOCs first — they will appear here automatically.";
+      el.value = buildReportIocs();
+    } else {
+      el = document.createElement("textarea");
+      el.rows = 3;
+    }
+    el.dataset.fieldId = field.id;
+    container.appendChild(el);
+  }
+}
 
-  function fillSubject() {
-    const subjectEl = document.getElementById("report-subject");
-    if (!subjectEl || subjectEl.value.trim()) return;
-    chrome.storage.session.get(["lastContentTab"], (d) => {
-      if (d && d.lastContentTab && d.lastContentTab.title) {
-        subjectEl.value = d.lastContentTab.title;
-      }
+function buildTemplateSelector() {
+  const sel = document.getElementById("report-tpl-select");
+  if (!sel) return;
+  sel.innerHTML = reportTemplates.length
+    ? reportTemplates.map(t => `<option value="${escapeHtml(t.id)}"${t.id === activeTemplateId ? " selected" : ""}>${escapeHtml(t.name)}</option>`).join("")
+    : '<option value="">No templates</option>';
+}
+
+function fillAutoFields() {
+  chrome.storage.session.get(["lastContentTab"], (d) => {
+    if (!(d && d.lastContentTab && d.lastContentTab.title)) return;
+    document.querySelectorAll('#report-form [data-auto-fill="pageTitle"]').forEach(el => {
+      if (!el.value.trim()) el.value = d.lastContentTab.title;
     });
-  }
+  });
+}
 
-  // On tab open: refresh IOCs + auto-fill subject
-  const reportTabBtn = document.querySelector('.tab[data-tab="report"]');
-  if (reportTabBtn) reportTabBtn.addEventListener("click", () => { refreshIocs(); fillSubject(); });
+(function wireReportTab() {
+  function onOpen() { buildReportForm(); fillAutoFields(); }
 
-  // Refresh button
-  document.getElementById("report-refresh")?.addEventListener("click", () => { refreshIocs(); fillSubject(); });
+  document.querySelector('.tab[data-tab="report"]')?.addEventListener("click", onOpen);
 
-  // Copy summary
+  document.getElementById("report-tpl-select")?.addEventListener("change", (e) => {
+    activeTemplateId = e.target.value;
+    chrome.storage.local.set({ activeTemplateId });
+    buildReportForm();
+    fillAutoFields();
+  });
+
+  document.getElementById("report-refresh")?.addEventListener("click", () => {
+    refreshReportIocs();
+    fillAutoFields();
+  });
+
   document.getElementById("report-copy")?.addEventListener("click", () => {
-    const get = id => (document.getElementById(id)?.value || "").trim();
-    const text = [
-      `Subject: ${get("report-subject")}`,
-      `ID from security control: ${get("report-id")}`,
-      `Status: ${get("report-status")}`,
-      ``,
-      `Description:`,
-      get("report-description"),
-      ``,
-      `IOCs:`,
-      get("report-iocs"),
-      ``,
-      `Recommendation:`,
-      get("report-recommendation"),
-      ``,
-      `Conclusion:`,
-      get("report-conclusion"),
-    ].join("\n");
-    navigator.clipboard.writeText(text).then(() => {
+    const tpl = reportTemplates.find(t => t.id === activeTemplateId) || reportTemplates[0];
+    if (!tpl) return;
+    const lines = [];
+    for (const field of (tpl.fields || [])) {
+      const el  = document.querySelector(`#report-form [data-field-id="${field.id}"]`);
+      const val = (el ? el.value : "").trim();
+      if (field.type === "text" || field.type === "select") {
+        lines.push(`${field.label}: ${val}`);
+      } else {
+        lines.push(`${field.label}:`);
+        if (val) lines.push(val);
+        lines.push("");
+      }
+    }
+    navigator.clipboard.writeText(lines.join("\n").trim()).then(() => {
       const btn = document.getElementById("report-copy");
       if (btn) { btn.textContent = "Copied ✓"; setTimeout(() => { btn.textContent = "Copy summary"; }, 1500); }
     });
@@ -5683,14 +5917,15 @@ level: high`;
    ============================================================ */
 (function wireConfigIO() {
   document.getElementById("export-config")?.addEventListener("click", () => {
-    chrome.storage.local.get(["splunkControls","kqlControls","kqlSettings","iocFieldSettings"], (d) => {
+    chrome.storage.local.get(["splunkControls","kqlControls","kqlSettings","iocFieldSettings","reportTemplates"], (d) => {
       const config = {
         version: "1",
         exported: new Date().toISOString(),
         splunkControls:   d.splunkControls   || [],
         kqlControls:      d.kqlControls      || [],
         kqlSettings:      d.kqlSettings      || {},
-        iocFieldSettings: d.iocFieldSettings || {}
+        iocFieldSettings: d.iocFieldSettings || {},
+        reportTemplates:  d.reportTemplates  || []
       };
       const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
       const url  = URL.createObjectURL(blob);
@@ -5716,11 +5951,13 @@ level: high`;
                                                           toSave.kqlSettings      = config.kqlSettings;
         if (config.iocFieldSettings && typeof config.iocFieldSettings === "object")
                                                           toSave.iocFieldSettings = config.iocFieldSettings;
+        if (Array.isArray(config.reportTemplates))        toSave.reportTemplates  = config.reportTemplates;
         chrome.storage.local.set(toSave, () => {
           loadSplunkControls(buildSplControls);
           loadKqlControls(buildKqlControls);
           loadIocFieldSettings(buildIocFieldsGrid);
           loadKqlSettings(buildKqlGrid);
+          loadReportTemplates(() => { buildTemplateSelector(); buildReportTemplatesList(); });
           if (st) { st.textContent = "Imported ✓"; setTimeout(() => { st.textContent = ""; }, 2500); }
         });
       } catch (err) {
