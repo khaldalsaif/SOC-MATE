@@ -614,9 +614,22 @@
       </div>
     </details>
 
-    <details class="settings-group" id="kqlfields-group">
+    <details class="settings-group" id="kql-controls-group">
       <summary>Defender KQL — tables &amp; columns</summary>
-      <p class="hint">Pre-fill the Defender Advanced Hunting <strong>table</strong>, <strong>column</strong>, and <strong>operator</strong> for each IOC category. Used when you click the <strong>Defender</strong> button on any IOC card.</p>
+      <p class="hint">Define your Defender Advanced Hunting data sources. For each table set the <strong>column</strong> and <strong>operator</strong> per IOC type. Leave a field blank to exclude that IOC type from this table. When you click <strong>Defender</strong> on an IOC card, one sub-query is generated per matching table — giving you a ready-to-paste multi-table hunt.</p>
+      <p class="hint" style="margin-top:0;">Operators: <code>in~</code> (case-insensitive exact — best for IPs/hashes), <code>in</code> (case-sensitive exact), <code>has_any</code> (token match — best for domains/URLs/paths).</p>
+      <div id="kql-controls-list"></div>
+      <div class="util-btns" style="margin-top:6px;">
+        <button id="kql-ctrl-add" class="mini">+ Add table</button>
+        <button id="kql-ctrl-defaults" class="mini">Load defaults</button>
+        <button id="save-kql-controls" class="accent">Save</button>
+        <span id="kql-controls-status" class="hint"></span>
+      </div>
+    </details>
+
+    <details class="settings-group" id="kqlfields-group">
+      <summary>Defender KQL — simple fallback (single table)</summary>
+      <p class="hint">Simple fallback used when <em>no</em> KQL table above covers an IOC type. Pre-fill the <strong>table</strong>, <strong>column</strong>, and <strong>operator</strong> for each IOC category.</p>
       <p class="hint" style="margin-top:0;">Operators that work with multiple values: <code>in~</code> (case-insensitive exact match — best for IPs/hashes), <code>in</code> (case-sensitive exact), <code>has_any</code> (token match — best for domains/URLs/paths).</p>
       <div id="kql-fields-grid" class="kql-fields-grid"></div>
       <div class="util-btns">

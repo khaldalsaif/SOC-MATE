@@ -911,6 +911,14 @@ body.fr-open { padding-bottom: 72px; }
   text-overflow: ellipsis;
 }
 
+/* KQL controls: 3-column grid per IOC type — label | column | operator */
+.kql-ctrl-fields {
+  display: grid;
+  grid-template-columns: 80px 1fr 80px;
+  gap: 3px 6px;
+  align-items: center;
+}
+
 /* ---- Rule builders (YARA / Sigma / Export) ---- */
 .rule-opts {
   display: flex;

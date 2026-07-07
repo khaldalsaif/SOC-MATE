@@ -25,7 +25,8 @@ let lastExtractedUrl = "";   // URL the current results came from (gates auto-ex
 let lastOwnSaveTs = 0;       // timestamp of our own last saveLastExtraction — skip self-echoes
 let iocFieldSettings = {};   // { type: { field, index, sourcetype } } — persisted to storage
 let kqlSettings      = {};   // { type: { table, col, op } } — persisted to storage
-let splunkControls      = [];   // [{ id, name, index, sourcetype, fields:{type:fieldname} }]
+let splunkControls   = [];   // [{ id, name, index, sourcetype, fields:{type:fieldname} }]
+let kqlControls      = [];   // [{ id, name, fields:{type:{col,op}} }]
 let savedOpenSections   = null; // Set of IOC types that were open when popup last closed
 
 /* Are we running as the full-page workspace (popup.html?view=tab) rather than
@@ -1335,23 +1336,42 @@ function buildInQuery(type) {
     alert("IN query copied");
   }
 }
+/* Controls that cover a given IOC type (have a non-empty col for it). */
+function kqlControlsForType(type) {
+  return kqlControls.filter(c => c.fields && c.fields[type] && c.fields[type].col);
+}
 function buildDefenderQuery(type) {
   const values = state.rendered[type] || [];
   if (!values.length) return;
-  const base    = KQL[type] || { table: "", col: type, op: "in~" };
-  const saved   = kqlSettings[type] || {};
-  // Saved settings override hardcoded KQL defaults; empty-string table is intentional (no prefix).
-  const table   = ("table" in saved) ? saved.table : base.table;
-  const op      = saved.op  || base.op;
-  const defCol  = saved.col || base.col;
-  // Per-session field-input still wins when the analyst typed something that differs
-  // from the current Splunk default (preserves the original live-override behaviour).
-  const input   = document.querySelector(`.field-input[data-type="${type}"]`);
-  const typed   = input ? input.value.trim() : "";
-  const splDef  = input ? (input.dataset.default || "") : "";
-  const col     = (typed && typed !== splDef) ? typed : defCol;
-  const list    = values.map(v => `"${escapeSpl(v)}"`).join(", ");
-  const filter  = `where ${col} ${op} (${list})`;
+  const list = values.map(v => `"${escapeSpl(v)}"`).join(", ");
+
+  // Per-session field override (analyst typed into the card's custom field input)
+  const input      = document.querySelector(`.field-input[data-type="${type}"]`);
+  const typed      = input ? input.value.trim() : "";
+  const splDef     = input ? (input.dataset.default || "") : "";
+  const colOverride = (typed && typed !== splDef) ? typed : null;
+
+  // Use controls when any cover this IOC type (mirrors Splunk multi-source behaviour)
+  const controls = kqlControlsForType(type);
+  if (controls.length) {
+    const blocks = controls.map(ctrl => {
+      const col = colOverride || ctrl.fields[type].col;
+      const op  = ctrl.fields[type].op || "in~";
+      return `${ctrl.name}\n| where ${col} ${op} (${list})`;
+    });
+    navigator.clipboard.writeText(blocks.join("\n\n"));
+    alert(`Defender query copied (${controls.length} table${controls.length > 1 ? "s" : ""})`);
+    return;
+  }
+
+  // Fallback: simple kqlSettings / hardcoded KQL defaults
+  const base   = KQL[type] || { table: "", col: type, op: "in~" };
+  const saved  = kqlSettings[type] || {};
+  const table  = ("table" in saved) ? saved.table : base.table;
+  const op     = saved.op  || base.op;
+  const defCol = saved.col || base.col;
+  const col    = colOverride || defCol;
+  const filter = `where ${col} ${op} (${list})`;
   navigator.clipboard.writeText(table ? `${table}\n| ${filter}` : `| ${filter}`);
   alert("Defender query copied");
 }
@@ -3227,6 +3247,48 @@ const DEFAULT_SPL_CONTROLS = [
              files:"FileName", paths:"DirectoryTree", hostnames:"ComputerName", ips:"RemoteAddressIP4" } }
 ];
 
+/* ============================================================
+   DEFAULT KQL CONTROLS
+   Mirrors the KQL constant: one card per Defender table, with
+   column + operator per IOC type that belongs to it.
+   ============================================================ */
+const DEFAULT_KQL_CONTROLS = [
+  { id:"net", name:"DeviceNetworkEvents",
+    fields:{
+      src_ip:  { col:"RemoteIP",  op:"in~" },
+      dest_ip: { col:"RemoteIP",  op:"in~" },
+      ips:     { col:"RemoteIP",  op:"in~" },
+      domains: { col:"RemoteUrl", op:"has_any" },
+      urls:    { col:"RemoteUrl", op:"has_any" }
+    }
+  },
+  { id:"email", name:"EmailEvents",
+    fields:{
+      emails:         { col:"SenderFromAddress", op:"in~" },
+      email_subjects: { col:"Subject",           op:"has_any" }
+    }
+  },
+  { id:"devinfo", name:"DeviceInfo",
+    fields:{
+      hostnames: { col:"DeviceName", op:"in~" }
+    }
+  },
+  { id:"file", name:"DeviceFileEvents",
+    fields:{
+      files:  { col:"FileName",   op:"in~" },
+      paths:  { col:"FolderPath", op:"in~" },
+      md5:    { col:"MD5",        op:"in~" },
+      sha1:   { col:"SHA1",       op:"in~" },
+      sha256: { col:"SHA256",     op:"in~" }
+    }
+  },
+  { id:"cloudapp", name:"CloudAppEvents",
+    fields:{
+      user_agents: { col:"UserAgent", op:"has_any" }
+    }
+  }
+];
+
 function loadSplunkControls(cb) {
   chrome.storage.local.get(["splunkControls"], (d) => {
     splunkControls = Array.isArray(d.splunkControls) ? d.splunkControls : [];
@@ -3413,6 +3475,157 @@ if (saveAutoExtractUrlsBtn) saveAutoExtractUrlsBtn.addEventListener("click", () 
   });
 });
 
+/* ============================================================
+   DEFENDER KQL CONTROLS
+   Mirrors the Splunk security controls system: one card per
+   Defender table, with column + operator per IOC type.
+   Clicking "Defender" generates one sub-query per matching
+   table, joined with a blank line between them.
+   ============================================================ */
+function loadKqlControls(cb) {
+  chrome.storage.local.get(["kqlControls"], (d) => {
+    kqlControls = Array.isArray(d.kqlControls) ? d.kqlControls : [];
+    if (cb) cb();
+  });
+}
+
+/* Render one KQL control card and append it to `container`. */
+function renderKqlControlCard(ctrl, container) {
+  const card = document.createElement("div");
+  card.className = "spl-ctrl-card";
+  card.dataset.ctrlId = ctrl.id;
+
+  // ── header: table name + remove button ──────────────────────
+  const hdr = document.createElement("div");
+  hdr.className = "spl-ctrl-header";
+
+  const nameInp = document.createElement("input");
+  nameInp.className = "spl-ctrl-name";
+  nameInp.type = "text";
+  nameInp.placeholder = "Table name (e.g. DeviceNetworkEvents)";
+  nameInp.value = ctrl.name || "";
+
+  const removeBtn = document.createElement("button");
+  removeBtn.className = "mini";
+  removeBtn.textContent = "✕ Remove";
+  removeBtn.addEventListener("click", () => card.remove());
+
+  hdr.appendChild(nameInp);
+  hdr.appendChild(removeBtn);
+  card.appendChild(hdr);
+
+  // ── column + operator per IOC type ──────────────────────────
+  const div = document.createElement("div");
+  div.className = "spl-ctrl-divider";
+  div.textContent = "Column + operator per IOC type  (blank = not covered)";
+  card.appendChild(div);
+
+  const fgrid = document.createElement("div");
+  fgrid.className = "kql-ctrl-fields";
+
+  for (const type of Object.keys(TITLES)) {
+    const lbl = document.createElement("div");
+    lbl.className = "spl-ctrl-fl";
+    lbl.textContent = TITLES[type];
+    fgrid.appendChild(lbl);
+
+    const typeData = (ctrl.fields && ctrl.fields[type]) || {};
+    const kqlDef   = KQL[type] || {};
+
+    // Column input
+    const colInp = document.createElement("input");
+    colInp.className = "ifc-inp";
+    colInp.type = "text";
+    colInp.dataset.kqlCtrlField = type;
+    colInp.dataset.kqlCtrlProp  = "col";
+    colInp.placeholder = kqlDef.col || "column";
+    colInp.value = typeData.col || "";
+    fgrid.appendChild(colInp);
+
+    // Operator select
+    const sel = document.createElement("select");
+    sel.className = "ifc-sel";
+    sel.dataset.kqlCtrlField = type;
+    sel.dataset.kqlCtrlProp  = "op";
+    const currentOp = typeData.op || kqlDef.op || "in~";
+    KQL_OPS.forEach(o => {
+      const opt = document.createElement("option");
+      opt.value = o;
+      opt.textContent = o;
+      if (o === currentOp) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    fgrid.appendChild(sel);
+  }
+  card.appendChild(fgrid);
+
+  card._nameInp = nameInp;
+  container.appendChild(card);
+}
+
+function buildKqlControls() {
+  const list = document.getElementById("kql-controls-list");
+  if (!list) return;
+  list.innerHTML = "";
+  for (const ctrl of kqlControls) renderKqlControlCard(ctrl, list);
+}
+
+/* Collect current UI state into a plain array (called before saving). */
+function collectKqlControls() {
+  const list = document.getElementById("kql-controls-list");
+  if (!list) return [];
+  const result = [];
+  list.querySelectorAll(".spl-ctrl-card").forEach(card => {
+    const name = card._nameInp ? card._nameInp.value.trim() : "";
+    if (!name) return; // skip nameless cards
+    const fields = {};
+    card.querySelectorAll("[data-kql-ctrl-field]").forEach(el => {
+      const type = el.dataset.kqlCtrlField;
+      const prop = el.dataset.kqlCtrlProp;
+      if (type && prop) {
+        if (!fields[type]) fields[type] = {};
+        fields[type][prop] = el.value.trim();
+      }
+    });
+    // Only keep types where col is non-empty
+    const cleanFields = {};
+    Object.entries(fields).forEach(([t, v]) => { if (v.col) cleanFields[t] = v; });
+    result.push({
+      id:     card.dataset.ctrlId || ("kql_" + Date.now()),
+      name,
+      fields: cleanFields
+    });
+  });
+  return result;
+}
+
+/* "+ Add table" button */
+const kqlCtrlAddBtn = document.getElementById("kql-ctrl-add");
+if (kqlCtrlAddBtn) kqlCtrlAddBtn.addEventListener("click", () => {
+  const list = document.getElementById("kql-controls-list");
+  if (!list) return;
+  renderKqlControlCard({ id: "kql_" + Date.now(), name: "", fields: {} }, list);
+});
+
+/* "Load defaults" button */
+const kqlCtrlDefaultsBtn = document.getElementById("kql-ctrl-defaults");
+if (kqlCtrlDefaultsBtn) kqlCtrlDefaultsBtn.addEventListener("click", () => {
+  kqlControls = DEFAULT_KQL_CONTROLS.map(c => ({
+    ...c, fields: Object.fromEntries(Object.entries(c.fields).map(([t, v]) => [t, { ...v }]))
+  }));
+  buildKqlControls();
+});
+
+/* "Save" button */
+const saveKqlControlsBtn = document.getElementById("save-kql-controls");
+if (saveKqlControlsBtn) saveKqlControlsBtn.addEventListener("click", () => {
+  kqlControls = collectKqlControls();
+  chrome.storage.local.set({ kqlControls }, () => {
+    const st = document.getElementById("kql-controls-status");
+    if (st) { st.textContent = "Saved"; setTimeout(() => st.textContent = "", 2000); }
+  });
+});
+
 /* ---------- excluded (non-collectable) domains ---------- */
 function loadExcludedDomains() {
   chrome.storage.local.get(["excludedDomains"], (d) => {
@@ -3450,6 +3663,7 @@ loadExcludedDomains();
 loadIocFieldSettings(buildIocFieldsGrid);
 loadKqlSettings(buildKqlGrid);
 loadSplunkControls(buildSplControls);
+loadKqlControls(buildKqlControls);
 loadAutoExtractUrls();
 
 /* Auto-extract toggle: restore its saved state, then (once results are restored)
@@ -5701,8 +5915,12 @@ level: high`;
       keys:"field name index sourcetype splunk log location ioc category query", tab:"settings",
       run: () => { goTab("settings"); const el = document.getElementById("iocfields-group"); if (el) { el.open = true; el.scrollIntoView({behavior:"smooth"}); } } },
     { icon:"🛡️", label:"Defender KQL tables & columns",
-      desc:"Set Advanced Hunting table, column, and operator per IOC category",
-      keys:"defender kql table column operator advanced hunting mde atp query mtp", tab:"settings",
+      desc:"Define Defender Advanced Hunting tables with column and operator per IOC category",
+      keys:"defender kql table column operator advanced hunting mde atp query mtp controls multi source", tab:"settings",
+      run: () => { goTab("settings"); const el = document.getElementById("kql-controls-group"); if (el) { el.open = true; el.scrollIntoView({behavior:"smooth"}); } } },
+    { icon:"🛡️", label:"Defender KQL simple fallback",
+      desc:"Single-table fallback when no KQL control covers an IOC type",
+      keys:"defender kql fallback single table column operator", tab:"settings",
       run: () => { goTab("settings"); const el = document.getElementById("kqlfields-group"); if (el) { el.open = true; el.scrollIntoView({behavior:"smooth"}); } } },
     { icon:"👁️", label:"Categories",
       desc:"Show or hide individual IOC category cards",
