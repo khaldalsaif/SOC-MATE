@@ -24,8 +24,7 @@
     <button class="tab active" data-tab="extract"    title="Extract (Ctrl+1)">Extract</button>
     <button class="tab"        data-tab="utilities"  title="Utilities (Ctrl+2)">Utilities</button>
     <button class="tab"        data-tab="history"    title="History (Ctrl+3)">History</button>
-    <button class="tab"        data-tab="report"     title="Report (Ctrl+4)">Report</button>
-    <button class="tab"        data-tab="settings"   title="Settings (Ctrl+5)">Settings</button>
+    <button class="tab"        data-tab="settings"   title="Settings (Ctrl+4)">Settings</button>
   </div>
 
   <!-- ============ EXTRACT TAB ============ -->
@@ -354,18 +353,6 @@
     <div id="history-list"></div>
   </section>
 
-  <!-- ============ REPORT TAB ============ -->
-  <section id="tab-report" class="tabpanel">
-    <div class="topbar" style="justify-content:space-between;align-items:center;">
-      <select id="report-tpl-select" style="flex:1;max-width:190px;font-size:12px;padding:3px 6px;background:#0b1121;border:1px solid #334155;border-radius:4px;color:#cbd5e1;"></select>
-      <div style="display:flex;gap:6px;">
-        <button id="report-refresh" class="mini" title="Reload IOCs from extraction">↻ Refresh</button>
-        <button id="report-copy" class="accent">Copy summary</button>
-      </div>
-    </div>
-    <div id="report-form" class="report-form"></div>
-  </section>
-
   <!-- ============ SETTINGS TAB ============ -->
   <section id="tab-settings" class="tabpanel">
     <p class="hint settings-intro">All settings are stored locally on this machine. Tap a section to expand.</p>
@@ -682,18 +669,6 @@
         <input type="number" id="hist-cap" min="1" max="50" value="20" style="width:80px;" />
         <button id="save-hist" class="accent">Save history settings</button>
         <span id="hist-status" class="hint"></span>
-      </div>
-    </details>
-
-    <details class="settings-group" id="report-tpl-group">
-      <summary>Report templates</summary>
-      <p class="hint">Build named ticket templates for different alert types. Each template defines the fields in order. The <strong>IOCs (auto)</strong> type auto-fills from your current extraction with enrichment verdicts inline.</p>
-      <div id="report-tpl-list"></div>
-      <div class="util-btns" style="margin-top:6px;">
-        <button id="report-tpl-add" class="mini">+ Add template</button>
-        <button id="report-tpl-defaults" class="mini">Load defaults</button>
-        <button id="save-report-tpls" class="accent">Save</button>
-        <span id="report-tpl-status" class="hint"></span>
       </div>
     </details>
 
